@@ -27,7 +27,6 @@ import java.io.IOException;
 @RestController
 @Slf4j
 public class Routes {
-
   @Value("${app.path_traffic}")
   private String RESOURCE_PATH_TRAFFIC;
 
@@ -58,13 +57,15 @@ public class Routes {
   @Autowired
   CacheHelper cacheHelper;
 
+
   @RequestMapping("/simulate")
   public void setSimulate(@RequestParam(name = "status")
-                                    boolean status) {
+                              boolean status) {
     log.info("Simulated API's : " + status);
     cacheHelper.setLoadFromDirectory(status);
 
   }
+
 
   @GetMapping(value = "traffic/{z}/{x}/{y}",
       produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
@@ -99,7 +100,7 @@ public class Routes {
       throws IOException {
 
     ResponseEntity<Resource> response = null;
-    File file ;
+    File file;
     file = new File(RESOURCE_PATH + "\\" + y);
     if (cacheHelper.isLoadFromDirectory() && file.exists()) {
 
