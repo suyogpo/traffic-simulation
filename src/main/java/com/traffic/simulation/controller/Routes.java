@@ -1,5 +1,6 @@
 package com.traffic.simulation.controller;
 
+import com.traffic.simulation.cache.CacheHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -32,7 +34,7 @@ public class Routes {
   @Value("${app.traffic}")
   private String TRAFFIC_SERVICE_URL;
 
-  @Value("${app.traffic_key}")
+  @Value("${app.traffic_key_value}")
   private String TRAFFIC_SERVICE_KEY;
 
   @Value("${app.path_raah}")
@@ -41,15 +43,27 @@ public class Routes {
   @Value("${app.raah}")
   private String RAAH_SERVICE_URL;
 
-  @Value("${app.raah_key}")
+  @Value("${app.raah_key_value}")
   private String RAAH_SERVICE_KEY;
+
+  @Value("${app.raah_key}")
+  private String RAAH_SERVICE_KEY_v;
+
+  @Value("${app.traffic_key}")
+  private String TRAFFIC_SERVICE_KEY_v;
 
   @Autowired
   RestTemplate restTemplate;
 
-  @RequestMapping("/getTrafficData")
-  public void getTrafficData() {
-    log.info("Successfully called first rest api");
+  @Autowired
+  CacheHelper cacheHelper;
+
+  @RequestMapping("/simulate")
+  public void setSimulate(@RequestParam(name = "status")
+                                    boolean status) {
+    log.info("Simulated API's : " + status);
+    cacheHelper.setLoadFromDirectory(status);
+
   }
 
   @GetMapping(value = "traffic/{z}/{x}/{y}",
@@ -61,7 +75,7 @@ public class Routes {
     log.info("Successfully called rest api {}, {}, {}", z, x, y);
 
     ResponseEntity<Resource> response = process(z, x, y, TRAFFIC_SERVICE_URL, TRAFFIC_SERVICE_KEY,
-        RESOURCE_PATH_TRAFFIC);
+        RESOURCE_PATH_TRAFFIC, TRAFFIC_SERVICE_KEY_v);
 
     return response;
   }
@@ -76,21 +90,23 @@ public class Routes {
     log.info("Successfully called rest api {}, {}, {}", z, x, y);
 
     ResponseEntity<Resource> response = process(z, x, y, RAAH_SERVICE_URL, RAAH_SERVICE_KEY,
-        RESOURCE_PATH_RAAH);
+        RESOURCE_PATH_RAAH, RAAH_SERVICE_KEY_v);
     return response;
   }
 
   private ResponseEntity<Resource> process(String z, String x, String y, String SERVICE_URL,
-                                           String KEY, String RESOURCE_PATH)
+                                           String KEY, String RESOURCE_PATH, String service_key_v)
       throws IOException {
 
     ResponseEntity<Resource> response = null;
-    File file = new File(RESOURCE_PATH + "\\" + y);
+    File file ;
+    file = new File(RESOURCE_PATH + "\\" + y);
+    if (cacheHelper.isLoadFromDirectory() && file.exists()) {
 
-    if (file.exists()) {
       //send loaded file
       InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
       response = getFileResponse(file, resource);
+
     } else {
       //send file from actual web-service
 
@@ -100,7 +116,7 @@ public class Routes {
       HttpEntity<?> entity = new HttpEntity<>(headers);
 
       UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url)
-          .queryParam("key", KEY);
+          .queryParam(service_key_v, KEY);
 
       response = restTemplate.exchange(builder.toUriString(), HttpMethod.GET,
           entity, Resource.class);
@@ -115,6 +131,7 @@ public class Routes {
   private ResponseEntity<Resource> getFileResponse(File file, InputStreamResource resource) {
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName())
+        .header("Access-Control-Allow-Origin", "*")
         .header("Cache-Control", "no-cache, no-store, must-revalidate")
         .header("Pragma", "no-cache")
         .header("Expires", "0")
@@ -128,6 +145,7 @@ public class Routes {
 
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName)
+        .header("Access-Control-Allow-Origin", "*")
         .header("Cache-Control", "no-cache, no-store, must-revalidate")
         .header("Pragma", "no-cache")
         .header("Expires", "0")
